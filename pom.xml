@@ -9,7 +9,7 @@
 
 	<packaging>jar</packaging>
 
-	<name>ra-tor-client</name>
+	<name>ra-tor-hiddenservice</name>
 	<url>https://resolvingarchitecture.io</url>
 	<description>Resolving Architecture - TOR Hidden Service</description>
 	<inceptionYear>2020</inceptionYear>
