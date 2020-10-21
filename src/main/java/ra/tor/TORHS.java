@@ -51,8 +51,8 @@ public class TORHS extends JSON {
     @Override
     public void fromMap(Map<String, Object> m) {
         super.fromMap(m);
-        if(m.get("virtualPort")!=null) virtualPort = Integer.parseInt((String)m.get("virtualPort"));
-        if(m.get("targetPort")!=null) targetPort = Integer.parseInt((String)m.get("targetPort"));
+        if(m.get("virtualPort")!=null) virtualPort = (Integer)m.get("virtualPort");
+        if(m.get("targetPort")!=null) targetPort = (Integer)m.get("targetPort");
         if(m.get("serviceId")!=null) serviceId = (String)m.get("serviceId");
         if(m.get("webDir")!=null) webDir = (String)m.get("webDir");
         if(m.get("privateKey")!=null) privateKey = (String)m.get("privateKey");

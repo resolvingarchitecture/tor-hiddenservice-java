@@ -905,6 +905,8 @@ public class TORControlConnection implements TORControlCommands {
          */
         LOG.info(torhs.serviceId+" available: "+isHSAvailable(torhs.serviceId));
 
+
+
         torhs.virtualPort = virtPort;
         torhs.targetPort = targetPort;
 

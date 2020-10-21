@@ -71,14 +71,14 @@ public class TorHiddenServiceTest {
     /**
      * Send an op message to the hidden service and verify op reply.
      */
-    @Test
-    public void peer2Peer() {
-        Envelope e = Envelope.documentFactory();
-        DLC.addExternalRoute(TORClientService.class, HTTPClientService.OPERATION_SEND, e, orig, dest);
-        DLC.mark("op", e);
-        // Ratchet route for testing
-//        e.getDynamicRoutingSlip().nextRoute();
-        clientService.handleDocument(e);
-        Assert.assertTrue("{op=200}".equals(DLC.getContent(e)));
-    }
+//    @Test
+//    public void peer2Peer() {
+//        Envelope e = Envelope.documentFactory();
+//        DLC.addExternalRoute(TORClientService.class, HTTPClientService.OPERATION_SEND, e, orig, dest);
+//        DLC.mark("op", e);
+//        // Ratchet route for testing
+////        e.getDynamicRoutingSlip().nextRoute();
+//        clientService.handleDocument(e);
+//        Assert.assertTrue("{op=200}".equals(DLC.getContent(e)));
+//    }
 }

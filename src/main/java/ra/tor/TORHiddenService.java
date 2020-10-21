@@ -1,8 +1,8 @@
 package ra.tor;
 
-import ra.common.messaging.Message;
+import ra.common.Client;
+import ra.common.Envelope;
 import ra.common.messaging.MessageProducer;
-import ra.common.network.NetworkStatus;
 import ra.common.service.ServiceStatus;
 import ra.common.service.ServiceStatusListener;
 import ra.http.server.EnvelopeJSONDataHandler;
@@ -10,9 +10,9 @@ import ra.http.server.HTTPServerService;
 import ra.util.Config;
 import ra.util.FileUtil;
 import ra.util.RandomUtil;
+import ra.util.Wait;
 
 import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
 import java.net.Socket;
 import java.security.NoSuchAlgorithmException;
@@ -48,6 +48,7 @@ public class TORHiddenService extends HTTPServerService {
 
     @Override
     public boolean start(Properties p) {
+        updateStatus(ServiceStatus.INITIALIZING);
         if(!super.start(config)){
             return false;
         }
@@ -55,32 +56,39 @@ public class TORHiddenService extends HTTPServerService {
             config = Config.loadFromClasspath("ra-tor-hiddenservice.config", p, false);
         } catch (Exception e) {
             LOG.severe(e.getLocalizedMessage());
+            updateStatus(ServiceStatus.ERROR);
             return false;
         }
+        torhs = new TORHS();
         File privKeyFile = new File(getServiceDirectory(), "private_key");
         boolean destroyHiddenService = "true".equals(config.getProperty("ra.tor.privkey.destroy"));
         if(destroyHiddenService) {
+            LOG.info("Destroying Hidden Service....");
             privKeyFile.delete();
         } else if(privKeyFile.exists()) {
+            LOG.info("Tor Hidden Service key found, loading...");
+            byte[] bytes = null;
             try {
-                byte[] bytes = FileUtil.readFile(privKeyFile.getAbsolutePath());
-                torhs = new TORHS();
-                torhs.fromJSON(new String(bytes));
+                bytes = FileUtil.readFile(privKeyFile.getAbsolutePath());
             } catch (IOException e) {
                 LOG.warning(e.getLocalizedMessage());
                 // Ensure private key is removed
                 privKeyFile.delete();
             }
+            if(bytes!=null) {
+                torhs.fromJSON(new String(bytes));
+            }
             if(torhs.virtualPort==null || torhs.targetPort==null || torhs.serviceId==null || torhs.privateKey==null) {
                 // Probably corrupted file
+                LOG.info("Tor key found but likely corrupted, deleting....");
                 privKeyFile.delete();
-                torhs = null;
             }
         }
+        updateStatus(ServiceStatus.STARTING);
         try {
             controlConnection = getControlConnection();
-//                Map<String, String> m = conn.getInfo(Arrays.asList("stream-status", "orconn-status", "circuit-status", "version"));
-            Map<String, String> m = controlConnection.getInfo(Arrays.asList("version"));
+            Map<String, String> m = controlConnection.getInfo(Arrays.asList("stream-status", "orconn-status", "circuit-status", "version"));
+//            Map<String, String> m = controlConnection.getInfo(Arrays.asList("version"));
             StringBuilder sb = new StringBuilder();
             sb.append("TOR config:");
             for (Iterator<Map.Entry<String, String>> i = m.entrySet().iterator(); i.hasNext(); ) {
@@ -88,10 +96,10 @@ public class TORHiddenService extends HTTPServerService {
                 sb.append("\n\t"+e.getKey()+"="+e.getValue());
             }
             LOG.info(sb.toString());
-            controlConnection.setEventHandler(new DebuggingEventHandler(LOG));
+            controlConnection.setEventHandler(new TOREventHandler(torhs, LOG));
             controlConnection.setEvents(Arrays.asList("CIRC", "ORCONN", "INFO", "NOTICE", "WARN", "ERR", "HS_DESC", "HS_DESC_CONTENT"));
 
-            if(torhs==null) {
+            if(torhs.serviceId==null) {
                 // Private key file doesn't exist, was unreadable, or requested to be destroyed so create a new hidden service
                 privKeyFile = new File(getServiceDirectory(), "private_key");
                 int virtPort = randomTORPort();
@@ -114,6 +122,7 @@ public class TORHiddenService extends HTTPServerService {
                     FileUtil.writeFile(torhs.toJSON().getBytes(), privKeyFile.getAbsolutePath());
                 } else {
                     LOG.severe("Unable to create new TOR hidden service.");
+                    updateStatus(ServiceStatus.ERROR);
                     return  false;
                 }
             } else if(launch("TORHS, API, localhost, " + torhs.targetPort + ", " + EnvelopeJSONDataHandler.class.getName())) {
@@ -130,6 +139,7 @@ public class TORHiddenService extends HTTPServerService {
                 }
             } else {
                 LOG.severe("Unable to launch TOR hidden service.");
+                updateStatus(ServiceStatus.ERROR);
                 return false;
             }
         } catch (IOException e) {
@@ -139,12 +149,14 @@ public class TORHiddenService extends HTTPServerService {
             } else {
                 LOG.warning(e.getLocalizedMessage());
             }
+            updateStatus(ServiceStatus.ERROR);
             return false;
         } catch (NoSuchAlgorithmException e) {
             LOG.warning("TORAlgorithm not supported: "+e.getLocalizedMessage());
+            updateStatus(ServiceStatus.ERROR);
             return false;
         }
-
+        updateStatus(ServiceStatus.RUNNING);
         return true;
     }
 
@@ -178,5 +190,41 @@ public class TORHiddenService extends HTTPServerService {
     @Override
     public boolean gracefulShutdown() {
         return super.gracefulShutdown();
+    }
+
+    public static void main(String[] args) {
+        MessageProducer producer = new MessageProducer() {
+            private Logger LOG = Logger.getLogger(MessageProducer.class.getName());
+            @Override
+            public boolean send(Envelope envelope) {
+                LOG.info("Received Envelope: "+envelope.toJSON());
+                return true;
+            }
+
+            @Override
+            public boolean send(Envelope envelope, Client client) {
+                LOG.info("Received Envelope: "+envelope.toJSON());
+                return true;
+            }
+        };
+        ServiceStatusListener listener = new ServiceStatusListener() {
+            private Logger LOG = Logger.getLogger(ServiceStatusListener.class.getName());
+            @Override
+            public void serviceStatusChanged(String s, ServiceStatus serviceStatus) {
+                LOG.info("Received Service Status: "+serviceStatus.name()+" on Service: "+s);
+            }
+        };
+        Properties p = new Properties();
+//        p.put("ra.tor.privkey.destroy","true");
+        TORHiddenService service = new TORHiddenService(producer, listener);
+        service.start(p);
+
+        long start = new Date().getTime();
+
+        while(service.getServiceStatus()==ServiceStatus.RUNNING) {
+            Wait.aMin(1);
+            long end = new Date().getTime();
+            service.LOG.info("Uptime (in minutes): "+(end-start)/(60 * 1000));
+        }
     }
 }
