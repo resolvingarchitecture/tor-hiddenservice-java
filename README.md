@@ -1,7 +1,9 @@
 # TOR Hidden Service
 
-## TOR Project Informatin
+## TOR Project Information
 https://2019.www.torproject.org/docs/tor-onion-service.html.en#two
+
+Python Controller Docs: https://stem.torproject.org/
 
 ## Tor Embedded
 To come...
