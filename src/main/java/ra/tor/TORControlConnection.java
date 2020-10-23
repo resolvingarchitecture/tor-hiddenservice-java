@@ -865,7 +865,7 @@ public class TORControlConnection implements TORControlCommands {
         return createHiddenService(port, -1, private_key);
     }
 
-    public TORHS createHiddenService(Integer virtPort, Integer targetPort, String private_key) throws IOException, NoSuchAlgorithmException {
+    public TORHS createHiddenService(Integer virtPort, Integer targetPort, String privateKey) throws IOException, NoSuchAlgorithmException {
 
         // assemble port string
         String port = virtPort.toString();
@@ -881,7 +881,7 @@ public class TORControlConnection implements TORControlCommands {
         List<ReplyLine> result = null;
         for (String algorithm : TORAlgorithms.toArray())
             try {
-                result = sendAndWaitForResponse("ADD_ONION " + getPemPrivateKey(private_key, algorithm) + " Port=" + port + "\r\n", null);
+                result = sendAndWaitForResponse("ADD_ONION " + getPemPrivateKey(privateKey, algorithm) + " Port=" + port + "\r\n", null);
                 break;
             } catch (TORControlError e) {
                 if (e.getErrorType() != 513)
@@ -892,9 +892,27 @@ public class TORControlConnection implements TORControlCommands {
         // key type. Maybe Tor has a new key type available?
         if (null == result)
             throw new IOException("We should not be here. Contact the developers!");
-
-        TORHS torhs = new TORHS(result.get(0).msg.replace("ServiceID=", ""),
-                    private_key.contains("NEW") ? result.get(1).msg.replace("PrivateKey=", "") : private_key);
+        TORHS torhs = new TORHS();
+        torhs.virtualPort = virtPort;
+        torhs.targetPort = targetPort;
+        torhs.serviceId = result.get(0).msg.replace("ServiceID=", "");
+        String newPrivateKey = privateKey.contains("NEW") ? result.get(1).msg.replace("PrivateKey=", "") : privateKey;
+        if (newPrivateKey.startsWith("-----BEGIN")) { // we reused a key
+            torhs.privateKey = newPrivateKey;
+        } else {
+            String type = null;
+            if (newPrivateKey.startsWith(TORAlgorithms.RSA1024))
+                type = "RSA";
+            else if (newPrivateKey.startsWith(TORAlgorithms.ED25519V3))
+                type = "OPENSSH";
+            else
+                throw new NoSuchAlgorithmException(type);
+            newPrivateKey = "-----BEGIN " + type + " PRIVATE KEY-----\n"
+                    + newPrivateKey.substring(newPrivateKey.indexOf(":") + 1) + "\n-----END " + type
+                    + " PRIVATE KEY-----";
+            torhs.privateKey = newPrivateKey;
+            torhs.newKey = true;
+        }
 
         /*
          * by asking for the service we just created, TOR is going to acquire a suitable
@@ -904,11 +922,6 @@ public class TORControlConnection implements TORControlCommands {
          * triggers HS_DESC and HS_DESC_CONTENT events when TOR gets the information.
          */
         LOG.info(torhs.serviceId+" available: "+isHSAvailable(torhs.serviceId));
-
-
-
-        torhs.virtualPort = virtPort;
-        torhs.targetPort = targetPort;
 
         return torhs;
     }

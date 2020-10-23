@@ -7,10 +7,7 @@ import ra.common.service.ServiceStatus;
 import ra.common.service.ServiceStatusListener;
 import ra.http.server.EnvelopeJSONDataHandler;
 import ra.http.server.HTTPServerService;
-import ra.util.Config;
-import ra.util.FileUtil;
-import ra.util.RandomUtil;
-import ra.util.Wait;
+import ra.util.*;
 
 import java.io.File;
 import java.io.IOException;
@@ -33,6 +30,14 @@ public class TORHiddenService extends HTTPServerService {
     private TORControlConnection controlConnection;
     private TORHS torhs = null;
     private Properties config;
+
+    private File torUserHome;
+    private File torConfigHome;
+    private File torrcFile;
+    private File privKeyFile;
+    private File hiddenServiceDir;
+
+    private File torhsFile;
 
     public TORHiddenService(MessageProducer producer, ServiceStatusListener listener) {
         super(producer, listener);
@@ -60,9 +65,50 @@ public class TORHiddenService extends HTTPServerService {
             return false;
         }
         torhs = new TORHS();
-        File privKeyFile = new File(getServiceDirectory(), "private_key");
+
+        torUserHome = new File(SystemSettings.getUserHomeDir(), ".tor");
+        if(!torUserHome.exists()) {
+            LOG.severe("TOR User Home does not exist => TOR not installed.");
+            return false;
+        }
+
+        torConfigHome = new File(config.getProperty("ra.tor.config.home"));
+        if(!torConfigHome.exists()) {
+            LOG.severe("TOR Config Home /etc/tor does not exist => TOR not installed.");
+            return false;
+        }
+
+        torrcFile = new File(torConfigHome, "torrc");
+        if(!torrcFile.exists()) {
+            LOG.severe("TOR Config File /etc/tor/torrc does not exist => TOR not installed.");
+            return false;
+        }
+
+        if(config.getProperty("ra.tor.hs.name")==null) {
+            LOG.severe("ra.tor.hs.name (hidden service directory name) is a required property.");
+            return false;
+        }
+        hiddenServiceDir = new File(getServiceDirectory(), config.getProperty("ra.tor.hs.name") );
+        if(!hiddenServiceDir.exists() && !hiddenServiceDir.mkdir()) {
+            LOG.severe("TOR hidden service directory does not exist and unable to create.");
+            return false;
+        }
+
+        privKeyFile = new File(hiddenServiceDir, "private_key");
+
+        torhsFile = new File(getServiceDirectory(), "torhs");
+        if(torhsFile.exists()) {
+            try {
+                String json = new String(FileUtil.readFile(torhsFile.getAbsolutePath()));
+                torhs.fromJSON(json);
+            } catch (IOException e) {
+                LOG.severe(e.getLocalizedMessage());
+                return false;
+            }
+        }
+
         boolean destroyHiddenService = "true".equals(config.getProperty("ra.tor.privkey.destroy"));
-        if(destroyHiddenService) {
+        if(destroyHiddenService && privKeyFile.exists()) {
             LOG.info("Destroying Hidden Service....");
             privKeyFile.delete();
         } else if(privKeyFile.exists()) {
@@ -76,7 +122,7 @@ public class TORHiddenService extends HTTPServerService {
                 privKeyFile.delete();
             }
             if(bytes!=null) {
-                torhs.fromJSON(new String(bytes));
+                torhs.privateKey = new String(bytes);
             }
             if(torhs.virtualPort==null || torhs.targetPort==null || torhs.serviceId==null || torhs.privateKey==null) {
                 // Probably corrupted file
@@ -101,7 +147,7 @@ public class TORHiddenService extends HTTPServerService {
 
             if(torhs.serviceId==null) {
                 // Private key file doesn't exist, was unreadable, or requested to be destroyed so create a new hidden service
-                privKeyFile = new File(getServiceDirectory(), "private_key");
+                privKeyFile = new File(hiddenServiceDir, "private_key");
                 int virtPort = randomTORPort();
                 int targetPort = randomTORPort();
                 if(launch("TORHS, API, localhost, " + targetPort + ", " + EnvelopeJSONDataHandler.class.getName())) {
@@ -119,7 +165,36 @@ public class TORHiddenService extends HTTPServerService {
                     }
                     torhs.readable(true);
                     torhs.setCreatedAt(new Date().getTime());
-                    FileUtil.writeFile(torhs.toJSON().getBytes(), privKeyFile.getAbsolutePath());
+                    FileUtil.writeFile(torhs.privateKey.getBytes(), privKeyFile.getAbsolutePath());
+                    FileUtil.writeFile(torhs.toJSON().getBytes(), torhsFile.getAbsolutePath());
+
+                    // Make sure torrc file is up to date
+//                    List<String> torrcLines = FileUtil.readLines(torhsFile);
+//                    boolean hsDirConfigured = false;
+//                    boolean hsPortConfigured = false;
+//                    boolean nextLine = false;
+//                    String lineToRemove = null;
+//                    for(String line : torrcLines) {
+//                        if(!hsDirConfigured && line.equals("HiddenServiceDir "+hiddenServiceDir)) {
+//                            hsDirConfigured = true;
+//                            nextLine = true;
+//                        }
+//                        if(!hsPortConfigured && line.equals("HiddenServicePort "+ torhs.virtualPort+" 127.0.0.1:"+torhs.targetPort)) {
+//                            hsPortConfigured = true;
+//                        } else if(nextLine) {
+//                            // Port config after our hidden service directory is old so mark for removal
+//                            lineToRemove = line;
+//                        }
+//                    }
+//                    if(!hsDirConfigured || !hsPortConfigured) {
+//                        String torrcBody = new String(FileUtil.readFile(torrcFile.getAbsolutePath()));
+//                        if(!hsDirConfigured)
+//                            torrcBody += "\nHiddenServiceDir "+hiddenServiceDir+"\n";
+//                        if(!hsPortConfigured)
+//                            torrcBody += "\nHiddenServicePort "+ torhs.virtualPort+" 127.0.0.1:"+torhs.targetPort+"\n";
+//                        FileUtil.writeFile(torrcBody.getBytes(), torrcFile.getAbsolutePath());
+//                    }
+
                 } else {
                     LOG.severe("Unable to create new TOR hidden service.");
                     updateStatus(ServiceStatus.ERROR);
