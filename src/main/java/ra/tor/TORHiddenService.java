@@ -148,8 +148,18 @@ public class TORHiddenService extends HTTPServerService {
             if(torhs.serviceId==null) {
                 // Private key file doesn't exist, was unreadable, or requested to be destroyed so create a new hidden service
                 privKeyFile = new File(hiddenServiceDir, "private_key");
-                int virtPort = randomTORPort();
-                int targetPort = randomTORPort();
+                int virtPort;
+                if(config.getProperty("ra.tor.virtualPort")==null) {
+                    virtPort = randomTORPort();
+                } else {
+                    virtPort = Integer.parseInt(config.getProperty("ra.tor.virtualPort"));
+                }
+                int targetPort;
+                if(config.getProperty("ra.tor.targetPort")==null) {
+                    targetPort = randomTORPort();
+                } else {
+                    targetPort = Integer.parseInt(config.getProperty("ra.tor.targetPort"));
+                }
                 if(launch("TORHS, API, localhost, " + targetPort + ", " + EnvelopeJSONDataHandler.class.getName())) {
                     torhs = controlConnection.createHiddenService(virtPort, targetPort);
                     LOG.info("TOR Hidden Service Created: " + torhs.serviceId

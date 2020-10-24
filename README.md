@@ -5,12 +5,8 @@ https://2019.www.torproject.org/docs/tor-onion-service.html.en#two
 
 Python Controller Docs: https://stem.torproject.org/
 
-## Tor Embedded
-To come...
-
-## Tor External
+## Tor Router
 TOR as a hidden service running with an external TOR instance requires installing TOR as a daemon.
-This is accomplished by the 1M5 TOR Sensor by using the local Tor's SOCKSv5 proxy address and port.
 Install and configure TOR daemon:
 
 1. sudo apt-get update
@@ -20,3 +16,12 @@ Install and configure TOR daemon:
 5. in /etc/tor/torrc uncomment line: CookieAuthentication 1
 6. in /etc/tor/torrc replace: CookieAuthentication 1 with CookieAuthentication 0
 7. tor
+
+If you want to specify a virtual port and/or a target port use the following parameters for the service:
+
+* ra.tor.virtualPort
+* ra.tor.targetPort
+
+Not providing them will result in them being assigned random ports.
+
+An HTTP Server listening on the targetPort will get started on service start.
