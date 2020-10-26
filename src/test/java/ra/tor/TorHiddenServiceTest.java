@@ -56,10 +56,10 @@ public class TorHiddenServiceTest {
         hiddenService.gracefulShutdown();
     }
 
-    @Test
-    public void initializedTest() {
-        Assert.assertTrue(serviceRunning);
-    }
+//    @Test
+//    public void initializedTest() {
+//        Assert.assertTrue(serviceRunning);
+//    }
 
     /**
      * Send an op message to the hidden service and verify op reply.
