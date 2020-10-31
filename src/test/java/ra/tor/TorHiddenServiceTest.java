@@ -35,7 +35,7 @@ public class TorHiddenServiceTest {
         props = new Properties();
         props.put("ra.tor.privkey.destroy", "true");
         mockProducerClient = new MockProducerClient();
-        clientService = new TORClientService(mockProducerClient, null, new NetworkBuilderStrategy());
+        clientService = new TORClientService(mockProducerClient, null);
         clientService.start(props);
         orig = new NetworkPeer("Tor");
         orig.setId("afiome3290jLkf.onion");
