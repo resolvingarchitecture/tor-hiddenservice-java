@@ -4,7 +4,7 @@ import ra.common.Client;
 import ra.common.Envelope;
 import ra.common.messaging.MessageProducer;
 import ra.common.service.ServiceStatus;
-import ra.common.service.ServiceStatusListener;
+import ra.common.service.ServiceStatusObserver;
 import ra.http.server.EnvelopeJSONDataHandler;
 import ra.http.server.HTTPServerService;
 import ra.util.*;
@@ -39,8 +39,8 @@ public class TORHiddenService extends HTTPServerService {
 
     private File torhsFile;
 
-    public TORHiddenService(MessageProducer producer, ServiceStatusListener listener) {
-        super(producer, listener);
+    public TORHiddenService(MessageProducer producer, ServiceStatusObserver observer) {
+        super(producer, observer);
     }
 
     TORHS getTorhs() {
@@ -292,8 +292,8 @@ public class TORHiddenService extends HTTPServerService {
                 return true;
             }
         };
-        ServiceStatusListener listener = new ServiceStatusListener() {
-            private Logger LOG = Logger.getLogger(ServiceStatusListener.class.getName());
+        ServiceStatusObserver listener = new ServiceStatusObserver() {
+            private Logger LOG = Logger.getLogger(ServiceStatusObserver.class.getName());
             @Override
             public void serviceStatusChanged(String s, ServiceStatus serviceStatus) {
                 LOG.info("Received Service Status: "+serviceStatus.name()+" on Service: "+s);

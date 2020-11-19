@@ -4,6 +4,7 @@ import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import ra.common.Envelope;
 import ra.common.network.NetworkBuilderStrategy;
 import ra.common.network.NetworkPeer;
 import ra.util.Wait;
@@ -48,6 +49,12 @@ public class TorHiddenServiceTest {
         dest.setPort(torhs.virtualPort);
         // Wait 20 seconds to allow Tor hidden service to broadcast its address on the Tor network
         Wait.aSec(20);
+        // TODO: Verify service running
+//        Envelope reqEnv = Envelope.documentFactory();
+//        clientService.handleDocument(reqEnv);
+//        Object objContent = reqEnv.getContent();
+        // check for content
+
     }
 
     @AfterClass
